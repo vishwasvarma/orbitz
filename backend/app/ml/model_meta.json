@@ -1,0 +1,12 @@
+{
+  "backend": "sklearn",
+  "features": [
+    "steps",
+    "exercise_minutes",
+    "sleep_hours",
+    "water_liters",
+    "sitting_hours",
+    "intensity_code",
+    "feeling_code"
+  ]
+}

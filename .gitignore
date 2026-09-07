@@ -1,0 +1,32 @@
+# Environment & secrets
+.env
+.env.local
+backend/.env
+frontend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+backend/.venv/
+ml/.venv/
+*.pkl
+!ml/models/.gitkeep
+
+# Node
+node_modules/
+frontend/dist/
+frontend/node_modules/
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# Local DB
+*.db
+*.sqlite3
