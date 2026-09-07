@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import ThemeToggle from '../components/ThemeToggle'
 
 const GOALS = [
   { id: 'muscle_gain', title: 'Muscle Gain', desc: 'Build muscle and strength' },
@@ -56,6 +57,9 @@ export default function Onboarding() {
 
   return (
     <div className="auth-shell onboarding">
+      <div className="onboarding-theme">
+        <ThemeToggle />
+      </div>
       <div className="auth-card wide">
         <p className="eyebrow">Step {step} of 3</p>
         <h1>Set up Orbitz</h1>

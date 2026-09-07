@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import ThemeToggle from './ThemeToggle'
 
 export default function Navbar() {
   const { logout, user } = useAuth()
@@ -31,6 +32,7 @@ export default function Navbar() {
           <NavLink to="/progress" onClick={() => setOpen(false)}>
             Progress
           </NavLink>
+          <ThemeToggle />
           <button className="linkish" onClick={handleLogout}>
             Logout{user?.username ? ` (${user.username})` : ''}
           </button>

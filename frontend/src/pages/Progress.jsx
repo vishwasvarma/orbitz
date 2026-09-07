@@ -59,10 +59,10 @@ export default function Progress() {
           </article>
         </div>
 
-        <ProgressChart data={days} dataKey="fitness_score" label="Fitness Score" color="#3ecf8e" />
-        <ProgressChart data={days} dataKey="steps" label="Steps" color="#5b9fd4" />
-        <ProgressChart data={days} dataKey="exercise_minutes" label="Exercise (min)" color="#e2a35a" />
-        <ProgressChart data={days} dataKey="weight" label="Weight (kg)" color="#c97b84" />
+        <ProgressChart data={days} dataKey="fitness_score" label="Fitness Score" />
+        <ProgressChart data={days} dataKey="steps" label="Steps" />
+        <ProgressChart data={days} dataKey="exercise_minutes" label="Exercise (min)" />
+        <ProgressChart data={days} dataKey="weight" label="Weight (kg)" />
       </main>
     </div>
   )
