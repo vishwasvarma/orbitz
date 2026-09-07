@@ -10,7 +10,7 @@ function readStoredTheme() {
   } catch {
     /* ignore */
   }
-  return 'light'
+  return 'dark'
 }
 
 export function ThemeProvider({ children }) {

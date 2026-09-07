@@ -2,7 +2,6 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import Loading from './components/Loading'
-import AuthLock from './components/AuthLock'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Onboarding from './pages/Onboarding'
@@ -48,21 +47,17 @@ export default function App() {
             <Route
               path="/login"
               element={
-                <AuthLock>
-                  <PublicOnly>
-                    <Login />
-                  </PublicOnly>
-                </AuthLock>
+                <PublicOnly>
+                  <Login />
+                </PublicOnly>
               }
             />
             <Route
               path="/register"
               element={
-                <AuthLock>
-                  <PublicOnly>
-                    <Register />
-                  </PublicOnly>
-                </AuthLock>
+                <PublicOnly>
+                  <Register />
+                </PublicOnly>
               }
             />
             <Route

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import ThemeToggle from '../components/ThemeToggle'
 
 export default function Register() {
   const { register } = useAuth()
@@ -31,6 +32,9 @@ export default function Register() {
 
   return (
     <div className="auth-shell">
+      <div className="onboarding-theme">
+        <ThemeToggle />
+      </div>
       <form className="auth-card" onSubmit={onSubmit}>
         <p className="eyebrow">Create account</p>
         <h1>Orbitz</h1>
