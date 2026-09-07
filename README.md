@@ -1,7 +1,5 @@
 # Orbitz
 
-# Orbitz
-
 Orbitz is a personalized fitness web application that helps users stay active based on their **fitness goals, daily activity, and progress**.
 
 Users create an account, choose a goal such as **weight gain, weight loss, muscle gain, cardio/endurance, or general fitness**, and submit daily fitness information. The system analyzes the data using an ML model and generates a personalized plan for the next day.
