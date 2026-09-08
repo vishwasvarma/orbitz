@@ -19,6 +19,10 @@ class DailyActivity(Base):
     water_liters: Mapped[float] = mapped_column(Float)
     sitting_hours: Mapped[float] = mapped_column(Float, default=0)
     feeling: Mapped[str] = mapped_column(String(32), default="normal")
+    exercise_breakdown: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
+    medical_constraints: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
+    diet_preference: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    food_allergies: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="activities")

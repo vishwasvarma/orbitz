@@ -1,8 +1,6 @@
 function resolveApiBase() {
   const host = typeof window !== 'undefined' ? window.location.hostname : '127.0.0.1'
-  const isLocal = host === 'localhost' || host === '127.0.0.1'
-  if (!isLocal) return `http://${host}:8010`
-  return import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+  return `http://${host}:8020`
 }
 
 const API_BASE = resolveApiBase()
@@ -49,10 +47,37 @@ async function request(path, options = {}) {
   return res.json()
 }
 
+async function download(path, filename) {
+  const headers = {}
+  const token = getToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+  const res = await fetch(`${API_BASE}${path}`, { headers })
+  if (!res.ok) {
+    let detail = 'Download failed'
+    try {
+      const err = await res.json()
+      detail = err.detail || detail
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
 export const api = {
   get: (path) => request(path),
   post: (path, json) => request(path, { method: 'POST', json }),
   put: (path, json) => request(path, { method: 'PUT', json }),
+  download,
   postForm: (path, form) =>
     request(path, {
       method: 'POST',

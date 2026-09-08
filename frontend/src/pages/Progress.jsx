@@ -8,6 +8,7 @@ export default function Progress() {
   const [weekly, setWeekly] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [downloading, setDownloading] = useState('')
 
   useEffect(() => {
     api
@@ -16,6 +17,18 @@ export default function Progress() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
+
+  const downloadReport = async (path, filename, key) => {
+    setDownloading(key)
+    setError('')
+    try {
+      await api.download(path, filename)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setDownloading('')
+    }
+  }
 
   if (loading) return <Loading />
 
@@ -29,6 +42,25 @@ export default function Progress() {
         <h1>My Progress</h1>
         <p className="tagline">Track how your activity and fitness score evolve.</p>
         {error ? <p className="error">{error}</p> : null}
+
+        <div className="dash-cta report-actions">
+          <button
+            type="button"
+            className="btn primary"
+            disabled={Boolean(downloading)}
+            onClick={() => downloadReport('/progress/weekly.pdf', 'orbitz-weekly-report.pdf', 'weekly')}
+          >
+            {downloading === 'weekly' ? 'Preparing…' : 'Download weekly PDF'}
+          </button>
+          <button
+            type="button"
+            className="btn ghost"
+            disabled={Boolean(downloading)}
+            onClick={() => downloadReport('/progress/three-day.pdf', 'orbitz-3-day-report.pdf', 'three')}
+          >
+            {downloading === 'three' ? 'Preparing…' : 'Download 3-day PDF'}
+          </button>
+        </div>
 
         <div className="summary-grid">
           <article>

@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 from fastapi import APIRouter, Depends
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
@@ -7,6 +8,7 @@ from app.models.user import User
 from app.models.activity import DailyActivity
 from app.models.analysis import FitnessAnalysis
 from app.services.auth_service import get_current_user
+from app.services.report_service import build_three_day_pdf, build_weekly_pdf
 
 router = APIRouter(prefix="/progress", tags=["progress"])
 
@@ -72,6 +74,32 @@ def weekly(
         },
         "consistency": f"{n}/7",
     }
+
+
+@router.get("/weekly.pdf")
+def weekly_pdf(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    pdf_bytes = build_weekly_pdf(db, current_user)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="orbitz-weekly-report.pdf"'},
+    )
+
+
+@router.get("/three-day.pdf")
+def three_day_pdf(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    pdf_bytes = build_three_day_pdf(db, current_user)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="orbitz-3-day-report.pdf"'},
+    )
 
 
 @router.get("/monthly")

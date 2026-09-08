@@ -7,27 +7,32 @@ from typing import Any
 from groq import Groq
 
 from app.config import get_settings
+from app.services.diet_rules import (
+    allowed_foods,
+    build_diet_plan,
+    sanitize_diet_section,
+)
 from app.services.exercise_rules import (
     GOAL_FOCUS,
     catalog_for_level,
+    filter_catalog_by_medical,
     intensity_for_context,
+    medical_labels,
 )
 
 
-def _rule_based_plan(context: dict[str, Any]) -> dict[str, Any]:
+def _rule_based_plan(context: dict[str, Any], catalog: list[dict[str, Any]]) -> dict[str, Any]:
     """Deterministic fallback if Groq is unavailable."""
     level = (context.get("fitness_level") or "beginner").lower()
     goal = context.get("fitness_goal") or "general"
     feeling = context.get("feeling") or "normal"
     activity_level = context.get("activity_level") or "MODERATE"
-    catalog = catalog_for_level(level)
     intensity = intensity_for_context(level, feeling, activity_level)
 
     strength = [e for e in catalog if e["category"] == "strength"]
     activity = [e for e in catalog if e["category"] == "activity"]
     recovery = [e for e in catalog if e["category"] == "recovery"]
 
-    # Tired / high previous load → lighter plan
     if feeling == "tired" or activity_level == "HIGH":
         pick_strength = strength[:2]
         pick_activity = activity[:1]
@@ -58,7 +63,6 @@ def _rule_based_plan(context: dict[str, Any]) -> dict[str, Any]:
     activity_items = [format_ex(e) for e in pick_activity]
     recovery_items = [format_ex(e) for e in pick_recovery]
 
-    # Goal tweak
     if goal == "cardio" and activity:
         activity_items = [format_ex(activity[0])]
         if len(activity) > 1:
@@ -68,6 +72,12 @@ def _rule_based_plan(context: dict[str, Any]) -> dict[str, Any]:
 
     water_target = "2-2.5 L" if float(context.get("water_liters") or 0) < 2 else "2.5-3 L"
     sleep_target = "7-8 hours"
+    diet = build_diet_plan(
+        context.get("diet_preference") or "veg",
+        context.get("food_allergies") or [],
+        goal,
+        feeling,
+    )
 
     return {
         "title": "Tomorrow's Plan",
@@ -76,11 +86,14 @@ def _rule_based_plan(context: dict[str, Any]) -> dict[str, Any]:
             "strength": strength_items,
             "activity": activity_items,
             "recovery": recovery_items,
+            "diet": diet,
             "hydration": {"aim": water_target},
             "sleep": {"aim": sleep_target},
         },
         "notes": walk_note,
         "goal_focus": GOAL_FOCUS.get(goal, GOAL_FOCUS["general"]),
+        "avoided_exercises": context.get("avoided_exercises") or [],
+        "medical_constraints": medical_labels(context.get("medical_constraints") or []),
     }
 
 
@@ -106,16 +119,26 @@ def generate_plan(context: dict[str, Any]) -> tuple[dict[str, Any], str]:
     settings = get_settings()
     level = (context.get("fitness_level") or "beginner").lower()
     goal = context.get("fitness_goal") or "general"
-    catalog = catalog_for_level(level)
+    full_catalog = catalog_for_level(level)
+    catalog, avoided = filter_catalog_by_medical(
+        full_catalog, context.get("medical_constraints") or []
+    )
+    context = {**context, "avoided_exercises": avoided}
     intensity = intensity_for_context(
         level,
         context.get("feeling") or "normal",
         context.get("activity_level") or "MODERATE",
     )
-    fallback = _rule_based_plan(context)
+    fallback = _rule_based_plan(context, catalog)
+    med_note = ""
+    if avoided:
+        med_note = f" Skipped due to medical constraints: {', '.join(avoided)}."
+    diet_pref = (context.get("diet_preference") or "veg").replace("_", "-")
     reason = (
         f"Based on {goal.replace('_', ' ')} goal, {level} level, "
-        f"ML activity={context.get('activity_level')}, feeling={context.get('feeling')}."
+        f"ML activity={context.get('activity_level')}, feeling={context.get('feeling')}, "
+        f"tomorrow diet={diet_pref}."
+        + med_note
     )
 
     if not settings.groq_api_key:
@@ -123,15 +146,17 @@ def generate_plan(context: dict[str, Any]) -> tuple[dict[str, Any], str]:
         return fallback, reason + " (rule-based; no Groq key)"
 
     allowed_names = [e["name"] for e in catalog]
+    foods = allowed_foods(context.get("diet_preference") or "veg", context.get("food_allergies") or [])
+    food_names = sorted({f["name"] for f in foods})
     system = (
         "You are Orbitz, a fitness planning agent. "
         "You MUST only choose exercises from the provided catalog. "
-        "Never invent new exercise names. "
-        "Respect fitness level, recovery, and daily limits. "
+        "Never invent new exercise names or food names. "
+        "Respect fitness level, recovery, medical constraints, diet preference, and allergies. "
         "Return ONLY valid JSON matching the schema."
     )
     user_prompt = f"""
-Create tomorrow's personalized fitness plan.
+Create tomorrow's personalized fitness and diet plan.
 
 User context:
 {json.dumps(context, indent=2)}
@@ -139,11 +164,20 @@ User context:
 Goal focus: {GOAL_FOCUS.get(goal, GOAL_FOCUS['general'])}
 Target intensity: {intensity}
 
-ALLOWED EXERCISE CATALOG (choose only from these):
+ALLOWED EXERCISE CATALOG (choose only from these — medical constraints already removed):
 {json.dumps(catalog, indent=2)}
 
 Allowed exercise names exactly:
 {allowed_names}
+
+Do NOT include these avoided exercises: {avoided}
+
+Tomorrow diet preference: {diet_pref}
+Food allergies to exclude: {context.get("food_allergies") or []}
+ALLOWED FOODS (choose only from these, keep listed amounts):
+{json.dumps(foods, indent=2)}
+Allowed food names exactly:
+{food_names}
 
 Return JSON with this shape:
 {{
@@ -153,6 +187,16 @@ Return JSON with this shape:
     "strength": [{{"name": "...", "prescription": "3 × 10"}}],
     "activity": [{{"name": "...", "prescription": "20 min"}}],
     "recovery": [{{"name": "...", "prescription": "5 min"}}],
+    "diet": {{
+      "preference": "{context.get('diet_preference') or 'veg'}",
+      "meals": [
+        {{"meal": "Breakfast", "items": [{{"name": "...", "amount": "..."}}]}},
+        {{"meal": "Lunch", "items": [{{"name": "...", "amount": "..."}}]}},
+        {{"meal": "Dinner", "items": [{{"name": "...", "amount": "..."}}]}},
+        {{"meal": "Snack", "items": [{{"name": "...", "amount": "..."}}]}}
+      ],
+      "notes": "short diet note"
+    }},
     "hydration": {{"aim": "2–2.5 L"}},
     "sleep": {{"aim": "7–8 hours"}}
   }},
@@ -165,6 +209,9 @@ Rules:
 - Beginner → low/moderate only.
 - Prefer 2–4 strength items, 1 activity, 1 recovery.
 - Every exercise name MUST be in the allowed list.
+- Every food name MUST be in the allowed food list. Do not recommend allergens.
+- If preference is veg, do not include chicken, fish, or eggs.
+- Lunch should look like simple portions, e.g. Chicken 100 g and rice 150 g when non-veg is allowed.
 """
 
     try:
@@ -176,7 +223,7 @@ Rules:
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.4,
-            max_tokens=1200,
+            max_tokens=1800,
         )
         content = completion.choices[0].message.content or ""
         parsed = _extract_json(content)
@@ -184,7 +231,6 @@ Rules:
             fallback["source"] = "rules_fallback"
             return fallback, reason + " (Groq parse fallback)"
 
-        # Validate exercise names against catalog
         allowed = set(allowed_names)
         for key in ("strength", "activity", "recovery"):
             items = parsed.get("sections", {}).get(key, [])
@@ -197,11 +243,18 @@ Rules:
                     cleaned.append(item)
             parsed.setdefault("sections", {})[key] = cleaned
 
-        # Ensure hydration/sleep exist
         sections = parsed.setdefault("sections", {})
         sections.setdefault("hydration", fallback["sections"]["hydration"])
         sections.setdefault("sleep", fallback["sections"]["sleep"])
-        if not sections.get("strength") and not sections.get("activity"):
+        sections["diet"] = sanitize_diet_section(
+            sections.get("diet") or parsed.get("diet"),
+            context.get("diet_preference") or "veg",
+            context.get("food_allergies") or [],
+            fallback["sections"]["diet"],
+        )
+        parsed["avoided_exercises"] = avoided
+        parsed["medical_constraints"] = medical_labels(context.get("medical_constraints") or [])
+        if not sections.get("strength") and not sections.get("activity") and not sections.get("recovery"):
             fallback["source"] = "rules_fallback"
             return fallback, reason + " (empty plan fallback)"
 

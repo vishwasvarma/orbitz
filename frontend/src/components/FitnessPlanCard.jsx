@@ -55,6 +55,35 @@ export default function FitnessPlanCard({ plan, compact = false }) {
         </section>
       ) : null}
 
+      {!compact && (sections.diet || data.diet) ? (
+        <section>
+          <h4>Diet {(sections.diet || data.diet)?.preference === 'non_veg' ? '(non-veg)' : '(veg)'}</h4>
+          <ul>
+            {(sections.diet || data.diet)?.meals?.map((meal) => (
+              <li key={meal.meal}>
+                <strong>{meal.meal}:</strong>{' '}
+                {(meal.items || [])
+                  .map((item) => `${item.name}${item.amount ? ` ${item.amount}` : ''}`)
+                  .join(', ')}
+              </li>
+            ))}
+          </ul>
+          {(sections.diet || data.diet)?.notes ? (
+            <p className="muted">{(sections.diet || data.diet).notes}</p>
+          ) : null}
+        </section>
+      ) : null}
+
+      {!compact && data.avoided_exercises?.length ? (
+        <p className="muted">Left out for medical reasons: {data.avoided_exercises.join(', ')}</p>
+      ) : null}
+
+      {compact && (sections.diet || data.diet) ? (
+        <p className="muted">
+          Diet: {(sections.diet || data.diet)?.preference === 'non_veg' ? 'non-veg' : 'veg'}
+        </p>
+      ) : null}
+
       <div className="plan-meta">
         {sections.hydration?.aim ? <p>Hydration: {sections.hydration.aim}</p> : null}
         {sections.sleep?.aim ? <p>Sleep: {sections.sleep.aim}</p> : null}

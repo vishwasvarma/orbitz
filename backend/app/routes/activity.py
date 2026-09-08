@@ -20,10 +20,13 @@ def create_activity(
 ):
     allowed_intensity = {"light", "moderate", "high"}
     allowed_feeling = {"tired", "normal", "energetic"}
+    allowed_diet = {"veg", "non_veg"}
     if payload.exercise_intensity not in allowed_intensity:
         raise HTTPException(status_code=400, detail="Invalid intensity")
     if payload.feeling not in allowed_feeling:
         raise HTTPException(status_code=400, detail="Invalid feeling")
+    if payload.diet_preference not in allowed_diet:
+        raise HTTPException(status_code=400, detail="Choose veg or non-veg for tomorrow")
 
     activity, analysis, plan = save_activity_and_generate_plan(
         db, current_user, payload.model_dump()
