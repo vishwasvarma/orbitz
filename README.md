@@ -2,7 +2,7 @@
 
 Orbitz is a personalized fitness web application that helps users stay active based on their **fitness goals, daily activity, and progress**.
 
-Users create an account, choose a goal such as **weight gain, weight loss, muscle gain, cardio/endurance, or general fitness**, and submit daily fitness information. The system analyzes the data using an ML model and generates a personalized plan for the next day.
+Users create an account, choose a goal such as **weight gain, weight loss, muscle gain, cardio/endurance, or general fitness**, and submit a daily check-in. The system analyzes the data using an ML model and an AI fitness agent, then generates a personalized **exercise and diet plan for tomorrow**.
 
 ---
 
@@ -11,37 +11,37 @@ Users create an account, choose a goal such as **weight gain, weight loss, muscl
 ```text
 Register / Login
       ↓
-Select Fitness Goal
+Onboarding (goal + fitness level)
       ↓
 Dashboard
       ↓
 Daily Check-in
       ↓
-Store Daily Data
+Store Daily Data (history is kept)
       ↓
 ML Fitness Analysis
       ↓
 AI Fitness Agent
       ↓
-Generate Tomorrow's Plan
+Tomorrow's Plan (exercise + diet)
       ↓
-Show Plan on Dashboard
-      ↓
-Next Day Check-in
+Progress charts + PDF reports
 ```
 
 ### Users can
 
 - Create an account and log in
-- Select a fitness goal
-- Enter personal information
-- Submit daily fitness information
-- Track weight, steps, exercise, sleep, and water
-- View a fitness score
-- View progress
-- Get a personalized plan for the next day
-- View previous plans
-- Logout
+- Complete onboarding (goal, level, and profile)
+- Submit a daily check-in
+- Log total exercise time **or minutes per activity** (walking, gym, running, and more)
+- Add **medical constraints** so those exercises are left out of tomorrow's plan
+- Choose **veg or non-veg for tomorrow** and list **food allergies**
+- Get a personalized exercise and diet plan for the next day
+- Track weight, steps, exercise, sleep, water, and fitness score
+- Download a **weekly PDF** and a **3-day PDF**
+- Log out
+
+Past check-ins and plans are not wiped when new fields are added. Re-submitting only updates **today's** check-in and **tomorrow's** plan.
 
 ---
 
@@ -49,14 +49,20 @@ Next Day Check-in
 
 ```text
 Daily User Data
+  (activity minutes, medical constraints, veg/non-veg, allergies)
        ↓
    ML Model
        ↓
 Activity Level + Fitness Score
        ↓
    AI Fitness Agent
+   (Groq, with a rule-based fallback)
        ↓
-Personalized Plan
+Exercise catalog (medical filters applied)
+       +
+Food catalog (diet preference + allergies applied)
+       ↓
+Personalized Tomorrow Plan
 ```
 
 ### ML Model
@@ -64,14 +70,13 @@ Personalized Plan
 The ML model analyzes:
 
 - Steps
-- Exercise duration
+- Exercise duration (sum of per-activity minutes when provided)
 - Sleep
 - Water intake
-- Weight
-- Previous activity
-- Consistency
+- Sitting time
+- Intensity and how the user feels
 
-It predicts the user's activity level and produces a fitness score.
+It predicts activity level and a fitness score.
 
 Example:
 
@@ -87,39 +92,44 @@ The agent receives:
 ```text
 User Goal
 Fitness Level
-Daily Activity
+Daily Activity (including minutes per type)
+Medical Constraints
+Tomorrow's diet preference (veg / non-veg)
+Food allergies
 Previous Data
 ML Result
 ```
 
-and generates a suitable plan for the next day.
+It builds tomorrow's plan from a **controlled exercise catalog** and a **controlled food catalog**. Exercises that conflict with medical constraints are skipped. Allergenic foods are excluded.
 
-> The initial version can use a rule-based fitness engine instead of an external LLM API. An LLM can be integrated later.
-
----
-
-# 🛠️ Tech Stack
-
-| Component       | Technology     |
-| --------------- | -------------- |
-| Frontend        | React          |
-| Styling         | CSS            |
-| Backend         | FastAPI        |
-| Language        | Python         |
-| Database        | PostgreSQL     |
-| ORM             | SQLAlchemy     |
-| Authentication  | JWT            |
-| ML              | Scikit-learn   |
-| Data Processing | Pandas         |
-| AI              | AI Agent / LLM |
-| Charts          | Recharts       |
+If no Groq API key is set, or the LLM call fails, Orbitz falls back to the rule-based engine.
 
 ---
 
-# 📁 Project Structure
+# Tech Stack
+
+| Component       | Technology        |
+| --------------- | ----------------- |
+| Frontend        | React + Vite      |
+| Styling         | CSS               |
+| Backend         | FastAPI           |
+| Language        | Python            |
+| Database        | SQLite (default)  |
+| ORM             | SQLAlchemy        |
+| Authentication  | JWT               |
+| ML              | Scikit-learn      |
+| AI              | Groq LLM + rules  |
+| Reports         | PDF (fpdf2)       |
+| Charts          | Recharts          |
+
+PostgreSQL can be used by setting `DATABASE_URL`. Local development uses SQLite (`backend/orbitz.db`). New columns are added with `ALTER TABLE` so existing rows are kept.
+
+---
+
+# Project Structure
 
 ```text
-FitAI/
+orbitz/
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
@@ -127,12 +137,12 @@ FitAI/
 │   │   │   ├── StatCard.jsx
 │   │   │   ├── FitnessPlanCard.jsx
 │   │   │   ├── ProgressChart.jsx
-│   │   │   ├── GoalCard.jsx
+│   │   │   ├── ThemeToggle.jsx
 │   │   │   └── Loading.jsx
 │   │   ├── pages/
 │   │   │   ├── Login.jsx
 │   │   │   ├── Register.jsx
-│   │   │   ├── GoalSelection.jsx
+│   │   │   ├── Onboarding.jsx
 │   │   │   ├── Dashboard.jsx
 │   │   │   ├── DailyCheckIn.jsx
 │   │   │   ├── TomorrowPlan.jsx
@@ -140,86 +150,55 @@ FitAI/
 │   │   ├── services/
 │   │   │   └── api.js
 │   │   ├── context/
-│   │   │   └── AuthContext.jsx
+│   │   │   ├── AuthContext.jsx
+│   │   │   └── ThemeContext.jsx
 │   │   ├── App.jsx
 │   │   ├── main.jsx
 │   │   └── index.css
-│   ├── package.json
-│   └── Dockerfile
+│   └── package.json
 │
 ├── backend/
 │   ├── app/
 │   │   ├── main.py
 │   │   ├── routes/
-│   │   │   ├── auth.py
-│   │   │   ├── users.py
-│   │   │   ├── activity.py
-│   │   │   ├── plans.py
-│   │   │   └── progress.py
 │   │   ├── models/
-│   │   │   ├── user.py
-│   │   │   ├── activity.py
-│   │   │   ├── analysis.py
-│   │   │   └── plan.py
 │   │   ├── schemas/
-│   │   │   ├── auth.py
-│   │   │   ├── activity.py
-│   │   │   └── plan.py
 │   │   ├── services/
-│   │   │   ├── auth_service.py
-│   │   │   ├── fitness_service.py
-│   │   │   └── agent_service.py
+│   │   │   ├── agent_service.py
+│   │   │   ├── exercise_rules.py
+│   │   │   ├── diet_rules.py
+│   │   │   ├── report_service.py
+│   │   │   └── fitness_service.py
 │   │   ├── ml/
-│   │   │   ├── model.pkl
-│   │   │   ├── predict.py
-│   │   │   └── preprocessing.py
 │   │   ├── database/
-│   │   │   ├── connection.py
-│   │   │   └── init_db.py
 │   │   └── config.py
 │   ├── requirements.txt
-│   ├── .env
-│   └── Dockerfile
+│   └── .env.example
 │
 ├── ml/
-│   ├── data/
-│   │   └── fitness_data.csv
-│   ├── notebooks/
-│   │   └── analysis.ipynb
-│   ├── src/
-│   │   ├── train.py
-│   │   ├── preprocess.py
-│   │   ├── evaluate.py
-│   │   └── predict.py
-│   ├── models/
-│   │   └── fitness_model.pkl
-│   └── requirements.txt
-│
-├── .gitignore
 ├── README.md
-└── LICENSE
+└── .gitignore
 ```
 
 ---
 
 # Database Structure
 
-Orbitz uses PostgreSQL.
-
 ### Users
 
 ```text
 users
 ├── id
-├── name
-├── email
+├── username
 ├── password_hash
+├── name
 ├── age
 ├── gender
 ├── height
 ├── weight
 ├── fitness_goal
 ├── fitness_level
+├── onboarding_complete
 └── created_at
 ```
 
@@ -232,13 +211,17 @@ daily_activity
 ├── date
 ├── weight
 ├── steps
-├── exercise_minutes
+├── exercise_minutes          # total (sum of breakdown when provided)
 ├── exercise_intensity
 ├── exercise_types
+├── exercise_breakdown        # e.g. { "Walking": 20, "Gym": 40 }
 ├── sleep_hours
 ├── water_liters
 ├── sitting_hours
 ├── feeling
+├── medical_constraints       # e.g. ["knee_pain"]
+├── diet_preference           # veg | non_veg (for tomorrow)
+├── food_allergies
 └── created_at
 ```
 
@@ -259,366 +242,197 @@ fitness_analysis
 fitness_plans
 ├── id
 ├── user_id
-├── date
-├── plan
+├── date                      # plan is for tomorrow
+├── plan                      # JSON: exercise sections + diet
 ├── reason
 └── created_at
-```
-
----
-
-# Data Flow
-
-```text
-React Frontend
-      │
-      │ POST /activity
-      ↓
-FastAPI Backend
-      │
-      ├──────────────→ PostgreSQL
-      │                    └── Store daily data
-      ↓
-ML Model
-      │
-      ├── Activity Level
-      └── Fitness Score
-      ↓
-AI Fitness Agent
-      │
-      ├── User Goal
-      ├── Fitness Level
-      ├── Daily Data
-      ├── Previous Data
-      └── ML Result
-      ↓
-Tomorrow's Plan
-      ↓
-PostgreSQL
-      ↓
-React Frontend
-      ├── Tomorrow Plan Page
-      └── Dashboard
 ```
 
 ---
 
 # Frontend Pages
 
-## 1. Login
+## Login / Register
 
-Existing users enter:
+Username and password. New accounts go to onboarding.
 
-```text
-Email
-Password
-```
+## Onboarding
 
-Buttons:
+Users choose a goal:
 
-```text
-[ Login ]
-[ Let's Begin ]
-```
+- Muscle Gain
+- Weight Gain
+- Weight Loss
+- Cardio & Endurance
+- General Fitness
 
-**Login** → Dashboard
+And a level: Beginner, Intermediate, or Advanced.
 
-**Let's Begin** → Register
+## Dashboard
 
----
+Shows fitness score, today's stats, and a preview of tomorrow's plan.
 
-## 2. Register
-
-New users enter:
-
-```text
-Name
-Email
-Password
-Confirm Password
-Age
-Gender
-Height
-Weight
-```
-
-After registration, the user selects a fitness goal.
-
----
-
-## 3. Goal Selection
-
-New users choose their main goal:
-
-- 💪 Muscle Gain
-- ⚖️ Weight Gain
-- 🔥 Weight Loss
-- 🏃 Cardio & Endurance
-- ❤️ General Fitness
-
-They also select:
-
-- Beginner
-- Intermediate
-- Advanced
-
-The goal and fitness level are stored in PostgreSQL.
-
----
-
-## 4. Dashboard
-
-The dashboard is the main page after login.
-
-It displays:
-
-- Fitness Score
-- Weight
-- Steps
-- Exercise time
-- Sleep
-- Water intake
-- Progress
-- Tomorrow's personalized plan
-
-The statistics use **asymmetrical cards** instead of a regular grid.
-
----
-
-## 5. Daily Check-in
+## Daily Check-in
 
 The user submits:
 
 ```text
 Weight
 Steps
-Exercise duration
+Exercise by type + minutes (Walking, Running, Gym, Cycling, Sports, Yoga, Other)
+  or a single total exercise minutes value
 Exercise intensity
-Exercise type
 Sleep
 Water
 Sitting hours
 Feeling
+Medical constraints (skipped in tomorrow's workout)
+Tomorrow veg or non-veg
+Food allergies to exclude
 ```
 
-Then clicks:
+Then:
 
 ```text
 [ Generate Tomorrow's Plan ]
 ```
 
----
+## Tomorrow's Plan
 
-## 6. Tomorrow's Plan
+Includes:
 
-Example:
+- Strength, activity, and recovery from the allowed catalog
+- Exercises skipped for medical reasons
+- Diet for breakfast, lunch, dinner, and a snack
+- Hydration and sleep targets
+
+Example diet line:
 
 ```text
-TOMORROW'S PLAN
-
-🏋️ Strength
-Squats       3 × 10
-Push-ups     3 × 8
-Lunges       3 × 10
-
-🏃 Activity
-20 minute walk
-
-🧘 Recovery
-5 minute stretching
-
-💧 Hydration
-Target: 2–2.5 L
-
-😴 Sleep
-Target: 7–8 hours
+Lunch: Chicken 100 g, Steamed rice 150 g, Salad 100 g
 ```
 
-The plan also appears on the dashboard.
+## Progress
+
+Weekly charts plus:
+
+```text
+[ Download weekly PDF ]
+[ Download 3-day PDF ]
+```
 
 ---
 
-## 7. Progress
-
-The progress page shows:
-
-- Weight trend
-- Steps trend
-- Exercise trend
-- Fitness score
-- Weekly consistency
-- Weekly averages
-
-Charts can be displayed using Recharts.
-
----
-
----
-
-# 🔐 Authentication
-
-Orbitz uses JWT-based authentication.
+# Authentication
 
 ```text
 POST /auth/register
 POST /auth/login
 GET  /auth/me
-POST /auth/logout
+POST /auth/onboarding
+PUT  /auth/profile
 ```
 
-Passwords are stored as hashed passwords.
+Passwords are stored hashed. Access uses a JWT bearer token.
 
 ---
 
-# 🔌 API Structure
-
-### User
-
-```text
-GET /users/profile
-PUT /users/profile
-PUT /users/goal
-```
+# API
 
 ### Daily Activity
 
 ```text
 POST /activity
-GET /activity/today
-GET /activity/history
+GET  /activity/today
+GET  /activity/history
 ```
 
-### Fitness Analysis
-
-```text
-POST /analysis
-GET /analysis/latest
-```
+`POST /activity` stores today's check-in, runs ML analysis, and upserts tomorrow's plan.
 
 ### Plans
 
 ```text
-POST /plans/generate
-GET  /plans/tomorrow
-GET  /plans/history
+GET /plans/tomorrow
+GET /plans/history
+GET /plans/{plan_id}
 ```
 
 ### Progress
 
 ```text
+GET /progress/dashboard
 GET /progress/weekly
 GET /progress/monthly
+GET /progress/weekly.pdf
+GET /progress/three-day.pdf
 ```
 
 ---
 
-# 💻 Local Setup
+# Local Setup
 
 ## Prerequisites
 
-Install:
-
-- Python 3.10+
+- Python 3.10+ (3.11 recommended)
 - Node.js 18+
-- PostgreSQL
 - Git
-
-Check installations:
 
 ```bash
 python --version
 node --version
 npm --version
-psql --version
 git --version
 ```
 
-## 1. Clone the Repository
-
-```bash
-git clone <YOUR_GITHUB_REPOSITORY_URL>
-cd FitAI
-```
-
-## 2. Create PostgreSQL Database
-
-```sql
-CREATE DATABASE fitai;
-```
-
-Example connection:
-
-```text
-postgresql://postgres:password@localhost:5432/fitai
-```
-
-## 3. Backend Setup
+## 1. Backend
 
 ```bash
 cd backend
-python -m venv venv
+python -m venv .venv
 ```
 
-### Windows
+Windows:
 
 ```bash
-venv\Scripts\activate
+.venv\Scripts\activate
 ```
 
-### Linux / macOS
+Linux / macOS:
 
 ```bash
-source venv/bin/activate
+source .venv/bin/activate
 ```
-
-Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Create `.env`:
+Copy `.env.example` to `.env` and set values:
 
 ```env
-DATABASE_URL=postgresql://postgres:password@localhost:5432/fitai
-SECRET_KEY=your_secret_key
+DATABASE_URL=sqlite:///./orbitz.db
+SECRET_KEY=orbitz-dev-secret-change-in-production
+GROQ_API_KEY=your_groq_api_key_here
+GROQ_MODEL=llama-3.3-70b-versatile
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
-If an LLM API is added later:
+`GROQ_API_KEY` is optional. Without it, plans still generate from the rule-based engine.
 
-```env
-LLM_API_KEY=your_api_key
-```
-
-**Never commit `.env` to GitHub.**
-
-## 4. Initialize Database
+Tables are created on startup. New columns are added without deleting existing data.
 
 ```bash
-python -m app.database.init_db
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8020
 ```
 
-## 5. Start FastAPI
+The frontend currently calls the API on port **8020** (`frontend/src/services/api.js`).
 
-```bash
-uvicorn app.main:app --reload
-```
+- API: http://127.0.0.1:8020
+- Docs: http://127.0.0.1:8020/docs
 
-Backend:
+## 2. Frontend
 
-```text
-http://127.0.0.1:8000
-```
-
-API documentation:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-## 6. Frontend Setup
-
-Open another terminal:
+In another terminal:
 
 ```bash
 cd frontend
@@ -626,878 +440,30 @@ npm install
 npm run dev
 ```
 
-Frontend:
+- App: http://localhost:5173
 
-```text
-http://localhost:5173
-```
+On the same Wi-Fi, others can open the Network URL Vite prints (for example `http://<your-lan-ip>:5173`). Keep the backend listening on `0.0.0.0`.
 
----
-
-# 🤖 AI Fitness Agent
-
-The agent uses:
-
-```text
-User Goal
-+
-Fitness Level
-+
-Daily Activity
-+
-Previous Activity
-+
-ML Result
-```
-
-to create the next day's plan.
-
-The agent should use a controlled set of exercises and fitness rules rather than freely inventing unsafe recommendations.
+**Never commit `.env` files that contain real API keys.**
 
 ---
 
-# 🧪 ML Model
+# Safety
 
-The initial ML model can be a **Random Forest Classifier**.
+Orbitz provides **general fitness and food suggestions** from user-provided information.
 
-Possible outputs:
+It is not a medical diagnosis, treatment, or nutrition prescription.
 
-```text
-LOW
-MODERATE
-HIGH
-```
-
-Possible input features:
-
-```text
-steps
-exercise_minutes
-sleep_hours
-water_liters
-weight
-consistency
-```
-
-Training:
-
-```text
-fitness_data.csv
-      ↓
-Preprocessing
-      ↓
-Train Model
-      ↓
-Evaluate Model
-      ↓
-Save Model
-      ↓
-fitness_model.pkl
-```
+People with medical conditions, injuries, or allergies should confirm advice with a qualified professional.
 
 ---
 
-# ⚠️ Safety
-
-Orbitz provides **general fitness recommendations** based on user-provided information.
-
-It is not a medical diagnosis or treatment system.
-
-Users with medical conditions or serious health concerns should consult a qualified healthcare professional.
-
----
-
-# 🎯 Project Goal
-
-Orbitz makes fitness guidance simple and personalized.
-
-Instead of giving every user the same plan, Orbitz uses their:
-
-- Fitness goal
-- Fitness level
-- Daily activity
-- Sleep
-- Water intake
-- Weight
-- Previous progress
-
-to create a plan that changes as their activity changes.
-
----
-
-## 📌 Project Summary
-
-```text
-Orbitz
-
-User
- ↓
-Choose Fitness Goal
- ↓
-Daily Check-in
- ↓
-PostgreSQL
- ↓
-ML Analysis
- ↓
-AI Fitness Agent
- ↓
-Personalized Tomorrow Plan
- ↓
-Dashboard
- ↓
-Track Progress
- ↓
-Repeat
-```
-
-is a personalized fitness web application that helps users stay active based on their **fitness goals, daily activity, and progress**.
-
-Users create an account, choose a goal such as **weight gain, weight loss, muscle gain, cardio/endurance, or general fitness**, and submit daily fitness information. The system analyzes the data using an ML model and generates a personalized plan for the next day.
-
----
-
-## What Orbitz Does
-
-```text
-Register / Login
-      ↓
-Select Fitness Goal
-      ↓
-Dashboard
-      ↓
-Daily Check-in
-      ↓
-Store Daily Data
-      ↓
-ML Fitness Analysis
-      ↓
-AI Fitness Agent
-      ↓
-Generate Tomorrow's Plan
-      ↓
-Show Plan on Dashboard
-      ↓
-Next Day Check-in
-```
-
-### Users can
-
-- Create an account and log in
-- Select a fitness goal
-- Enter personal information
-- Submit daily fitness information
-- Track weight, steps, exercise, sleep, and water
-- View a fitness score
-- View progress
-- Get a personalized plan for the next day
-- View previous plans
-- Logout
-
----
-
-## 🧠 How the Plan Is Generated
-
-```text
-Daily User Data
-       ↓
-   ML Model
-       ↓
-Activity Level + Fitness Score
-       ↓
-   AI Fitness Agent
-       ↓
-Personalized Plan
-```
-
-### ML Model
-
-The ML model analyzes:
-
-- Steps
-- Exercise duration
-- Sleep
-- Water intake
-- Weight
-- Previous activity
-- Consistency
-
-It predicts the user's activity level and produces a fitness score.
-
-Example:
-
-```text
-Activity Level: Moderate
-Fitness Score: 72/100
-```
-
-### AI Fitness Agent
-
-The agent receives:
-
-```text
-User Goal
-Fitness Level
-Daily Activity
-Previous Data
-ML Result
-```
-
-and generates a suitable plan for the next day.
-
-> The initial version can use a rule-based fitness engine instead of an external LLM API. An LLM can be integrated later.
-
----
-
-# 🛠️ Tech Stack
-
-| Component       | Technology     |
-| --------------- | -------------- |
-| Frontend        | React          |
-| Styling         | CSS            |
-| Backend         | FastAPI        |
-| Language        | Python         |
-| Database        | PostgreSQL     |
-| ORM             | SQLAlchemy     |
-| Authentication  | JWT            |
-| ML              | Scikit-learn   |
-| Data Processing | Pandas         |
-| AI              | AI Agent / LLM |
-| Charts          | Recharts       |
-
----
-
-# 📁 Project Structure
-
-```text
-FitAI/
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── Navbar.jsx
-│   │   │   ├── StatCard.jsx
-│   │   │   ├── FitnessPlanCard.jsx
-│   │   │   ├── ProgressChart.jsx
-│   │   │   ├── GoalCard.jsx
-│   │   │   └── Loading.jsx
-│   │   ├── pages/
-│   │   │   ├── Login.jsx
-│   │   │   ├── Register.jsx
-│   │   │   ├── GoalSelection.jsx
-│   │   │   ├── Dashboard.jsx
-│   │   │   ├── DailyCheckIn.jsx
-│   │   │   ├── TomorrowPlan.jsx
-│   │   │   └── Progress.jsx
-│   │   ├── services/
-│   │   │   └── api.js
-│   │   ├── context/
-│   │   │   └── AuthContext.jsx
-│   │   ├── App.jsx
-│   │   ├── main.jsx
-│   │   └── index.css
-│   ├── package.json
-│   └── Dockerfile
-│
-├── backend/
-│   ├── app/
-│   │   ├── main.py
-│   │   ├── routes/
-│   │   │   ├── auth.py
-│   │   │   ├── users.py
-│   │   │   ├── activity.py
-│   │   │   ├── plans.py
-│   │   │   └── progress.py
-│   │   ├── models/
-│   │   │   ├── user.py
-│   │   │   ├── activity.py
-│   │   │   ├── analysis.py
-│   │   │   └── plan.py
-│   │   ├── schemas/
-│   │   │   ├── auth.py
-│   │   │   ├── activity.py
-│   │   │   └── plan.py
-│   │   ├── services/
-│   │   │   ├── auth_service.py
-│   │   │   ├── fitness_service.py
-│   │   │   └── agent_service.py
-│   │   ├── ml/
-│   │   │   ├── model.pkl
-│   │   │   ├── predict.py
-│   │   │   └── preprocessing.py
-│   │   ├── database/
-│   │   │   ├── connection.py
-│   │   │   └── init_db.py
-│   │   └── config.py
-│   ├── requirements.txt
-│   ├── .env
-│   └── Dockerfile
-│
-├── ml/
-│   ├── data/
-│   │   └── fitness_data.csv
-│   ├── notebooks/
-│   │   └── analysis.ipynb
-│   ├── src/
-│   │   ├── train.py
-│   │   ├── preprocess.py
-│   │   ├── evaluate.py
-│   │   └── predict.py
-│   ├── models/
-│   │   └── fitness_model.pkl
-│   └── requirements.txt
-│
-├── .gitignore
-├── README.md
-└── LICENSE
-```
-
----
-
-# 🗄️ Database Structure
-
-Orbitz uses PostgreSQL.
-
-### Users
-
-```text
-users
-├── id
-├── name
-├── email
-├── password_hash
-├── age
-├── gender
-├── height
-├── weight
-├── fitness_goal
-├── fitness_level
-└── created_at
-```
-
-### Daily Activity
-
-```text
-daily_activity
-├── id
-├── user_id
-├── date
-├── weight
-├── steps
-├── exercise_minutes
-├── exercise_intensity
-├── exercise_types
-├── sleep_hours
-├── water_liters
-├── sitting_hours
-├── feeling
-└── created_at
-```
-
-### Fitness Analysis
-
-```text
-fitness_analysis
-├── id
-├── daily_activity_id
-├── activity_level
-├── fitness_score
-└── created_at
-```
-
-### Fitness Plans
-
-```text
-fitness_plans
-├── id
-├── user_id
-├── date
-├── plan
-├── reason
-└── created_at
-```
-
----
-
-# 🔄 Data Flow
-
-```text
-React Frontend
-      │
-      │ POST /activity
-      ↓
-FastAPI Backend
-      │
-      ├──────────────→ PostgreSQL
-      │                    └── Store daily data
-      ↓
-ML Model
-      │
-      ├── Activity Level
-      └── Fitness Score
-      ↓
-AI Fitness Agent
-      │
-      ├── User Goal
-      ├── Fitness Level
-      ├── Daily Data
-      ├── Previous Data
-      └── ML Result
-      ↓
-Tomorrow's Plan
-      ↓
-PostgreSQL
-      ↓
-React Frontend
-      ├── Tomorrow Plan Page
-      └── Dashboard
-```
-
----
-
-# 🌐 Frontend Pages
-
-## 1. Login
-
-Existing users enter:
-
-```text
-Email
-Password
-```
-
-Buttons:
-
-```text
-[ Login ]
-[ Let's Begin ]
-```
-
-**Login** → Dashboard
-
-**Let's Begin** → Register
-
----
-
-## 2. Register
-
-New users enter:
-
-```text
-Name
-Email
-Password
-Confirm Password
-Age
-Gender
-Height
-Weight
-```
-
-After registration, the user selects a fitness goal.
-
----
-
-## 3. Goal Selection
-
-New users choose their main goal:
-
-- 💪 Muscle Gain
-- ⚖️ Weight Gain
-- 🔥 Weight Loss
-- 🏃 Cardio & Endurance
-- ❤️ General Fitness
-
-They also select:
-
-- Beginner
-- Intermediate
-- Advanced
-
-The goal and fitness level are stored in PostgreSQL.
-
----
-
-## 4. Dashboard
-
-The dashboard is the main page after login.
-
-It displays:
-
-- Fitness Score
-- Weight
-- Steps
-- Exercise time
-- Sleep
-- Water intake
-- Progress
-- Tomorrow's personalized plan
-
-The statistics use **asymmetrical cards** instead of a regular grid.
-
----
-
-## 5. Daily Check-in
-
-The user submits:
-
-```text
-Weight
-Steps
-Exercise duration
-Exercise intensity
-Exercise type
-Sleep
-Water
-Sitting hours
-Feeling
-```
-
-Then clicks:
-
-```text
-[ Generate Tomorrow's Plan ]
-```
-
----
-
-## 6. Tomorrow's Plan
-
-Example:
-
-```text
-TOMORROW'S PLAN
-
-🏋️ Strength
-Squats       3 × 10
-Push-ups     3 × 8
-Lunges       3 × 10
-
-🏃 Activity
-20 minute walk
-
-🧘 Recovery
-5 minute stretching
-
-💧 Hydration
-Target: 2–2.5 L
-
-😴 Sleep
-Target: 7–8 hours
-```
-
-The plan also appears on the dashboard.
-
----
-
-## 7. Progress
-
-The progress page shows:
-
-- Weight trend
-- Steps trend
-- Exercise trend
-- Fitness score
-- Weekly consistency
-- Weekly averages
-
-Charts can be displayed using Recharts.
-
----
-
----
-
-# 🔐 Authentication
-
-Orbitz uses JWT-based authentication.
-
-```text
-POST /auth/register
-POST /auth/login
-GET  /auth/me
-POST /auth/logout
-```
-
-Passwords are stored as hashed passwords.
-
----
-
-# 🔌 API Structure
-
-### User
-
-```text
-GET /users/profile
-PUT /users/profile
-PUT /users/goal
-```
-
-### Daily Activity
-
-```text
-POST /activity
-GET /activity/today
-GET /activity/history
-```
-
-### Fitness Analysis
-
-```text
-POST /analysis
-GET /analysis/latest
-```
-
-### Plans
-
-```text
-POST /plans/generate
-GET  /plans/tomorrow
-GET  /plans/history
-```
-
-### Progress
-
-```text
-GET /progress/weekly
-GET /progress/monthly
-```
-
----
-
-# 💻 Local Setup
-
-## Prerequisites
-
-Install:
-
-- Python 3.10+
-- Node.js 18+
-- PostgreSQL
-- Git
-
-Check installations:
-
-```bash
-python --version
-node --version
-npm --version
-psql --version
-git --version
-```
-
-## 1. Clone the Repository
-
-```bash
-git clone <YOUR_GITHUB_REPOSITORY_URL>
-cd FitAI
-```
-
-## 2. Create PostgreSQL Database
-
-```sql
-CREATE DATABASE fitai;
-```
-
-Example connection:
-
-```text
-postgresql://postgres:password@localhost:5432/fitai
-```
-
-## 3. Backend Setup
-
-```bash
-cd backend
-python -m venv venv
-```
-
-### Windows
-
-```bash
-venv\Scripts\activate
-```
-
-### Linux / macOS
-
-```bash
-source venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Create `.env`:
-
-```env
-DATABASE_URL=postgresql://postgres:password@localhost:5432/fitai
-SECRET_KEY=your_secret_key
-```
-
-If an LLM API is added later:
-
-```env
-LLM_API_KEY=your_api_key
-```
-
-**Never commit `.env` to GitHub.**
-
-## 4. Initialize Database
-
-```bash
-python -m app.database.init_db
-```
-
-## 5. Start FastAPI
-
-```bash
-uvicorn app.main:app --reload
-```
-
-Backend:
-
-```text
-http://127.0.0.1:8000
-```
-
-API documentation:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-## 6. Frontend Setup
-
-Open another terminal:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend:
-
-```text
-http://localhost:5173
-```
-
----
-
-# 🤖 AI Fitness Agent
-
-The agent uses:
-
-```text
-User Goal
-+
-Fitness Level
-+
-Daily Activity
-+
-Previous Activity
-+
-ML Result
-```
-
-to create the next day's plan.
-
-The agent should use a controlled set of exercises and fitness rules rather than freely inventing unsafe recommendations.
-
----
-
-# 🧪 ML Model
-
-The initial ML model can be a **Random Forest Classifier**.
-
-Possible outputs:
-
-```text
-LOW
-MODERATE
-HIGH
-```
-
-Possible input features:
-
-```text
-steps
-exercise_minutes
-sleep_hours
-water_liters
-weight
-consistency
-```
-
-Training:
-
-```text
-fitness_data.csv
-      ↓
-Preprocessing
-      ↓
-Train Model
-      ↓
-Evaluate Model
-      ↓
-Save Model
-      ↓
-fitness_model.pkl
-```
-
----
-
-# ⚠️ Safety
-
-Orbitz provides **general fitness recommendations** based on user-provided information.
-
-It is not a medical diagnosis or treatment system.
-
-Users with medical conditions or serious health concerns should consult a qualified healthcare professional.
-
----
-
-# 🎯 Project Goal
-
-Orbitz makes fitness guidance simple and personalized.
-
-Instead of giving every user the same plan, Orbitz uses their:
-
-- Fitness goal
-- Fitness level
-- Daily activity
-- Sleep
-- Water intake
-- Weight
-- Previous progress
-
-to create a plan that changes as their activity changes.
-
----
-
-## 📌 Project Summary
-
-```text
-Orbitz
-
-User
- ↓
-Choose Fitness Goal
- ↓
-Daily Check-in
- ↓
-PostgreSQL
- ↓
-ML Analysis
- ↓
-AI Fitness Agent
- ↓
-Personalized Tomorrow Plan
- ↓
-Dashboard
- ↓
-Track Progress
- ↓
-Repeat
-```
+# Project Goal
+
+Orbitz makes fitness guidance simple and personal. Plans change with:
+
+- Fitness goal and level
+- Daily activity, including time spent on each type
+- Medical constraints
+- Tomorrow's veg / non-veg choice and allergies
+- Sleep, water, weight, and recent progress
