@@ -1,4 +1,11 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+function resolveApiBase() {
+  const host = typeof window !== 'undefined' ? window.location.hostname : '127.0.0.1'
+  const isLocal = host === 'localhost' || host === '127.0.0.1'
+  if (!isLocal) return `http://${host}:8010`
+  return import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+}
+
+const API_BASE = resolveApiBase()
 
 export function getToken() {
   return localStorage.getItem('orbitz_token')

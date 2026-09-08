@@ -1,17 +1,17 @@
-import { NavLink, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
-import { useAuth } from '../context/AuthContext'
-import ThemeToggle from './ThemeToggle'
+import { NavLink, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Navbar() {
-  const { logout, user } = useAuth()
-  const navigate = useNavigate()
-  const [open, setOpen] = useState(false)
+  const { logout, user } = useAuth();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
 
   const handleLogout = () => {
-    logout()
-    navigate('/login')
-  }
+    logout();
+    navigate("/login");
+  };
 
   return (
     <header className="nav">
@@ -19,10 +19,14 @@ export default function Navbar() {
         <NavLink to="/dashboard" className="brand">
           Orbitz
         </NavLink>
-        <button className="nav-toggle" onClick={() => setOpen((v) => !v)} aria-label="Menu">
+        <button
+          className="nav-toggle"
+          onClick={() => setOpen((v) => !v)}
+          aria-label="Menu"
+        >
           ☰
         </button>
-        <nav className={`nav-links ${open ? 'open' : ''}`}>
+        <nav className={`nav-links ${open ? "open" : ""}`}>
           <NavLink to="/dashboard" onClick={() => setOpen(false)}>
             Dashboard
           </NavLink>
@@ -34,10 +38,10 @@ export default function Navbar() {
           </NavLink>
           <ThemeToggle />
           <button className="linkish" onClick={handleLogout}>
-            Logout{user?.username ? ` (${user.username})` : ''}
+            Logout
           </button>
         </nav>
       </div>
     </header>
-  )
+  );
 }
