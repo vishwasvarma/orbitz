@@ -4,8 +4,15 @@ from app.config import get_settings
 
 settings = get_settings()
 
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
-engine = create_engine(settings.database_url, connect_args=connect_args)
+is_sqlite = settings.database_url.startswith("sqlite")
+connect_args = {"check_same_thread": False} if is_sqlite else {}
+engine = create_engine(
+    settings.database_url,
+    connect_args=connect_args,
+    # Hosted Postgres can idle down, leaving pooled connections stale.
+    pool_pre_ping=not is_sqlite,
+    pool_recycle=300 if not is_sqlite else -1,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

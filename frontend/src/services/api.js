@@ -1,4 +1,6 @@
 function resolveApiBase() {
+  const configured = import.meta.env.VITE_API_URL
+  if (configured) return configured.replace(/\/+$/, '')
   const host = typeof window !== 'undefined' ? window.location.hostname : '127.0.0.1'
   return `http://${host}:8020`
 }
