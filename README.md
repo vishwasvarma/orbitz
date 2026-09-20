@@ -6,6 +6,27 @@ Users create an account, choose a goal such as **weight gain, weight loss, muscl
 
 ---
 
+## Live Demo
+
+| Layer    | URL |
+| -------- | --- |
+| Frontend | https://vishwasvarma.github.io/orbitz/ |
+| Backend  | https://orbitz-1ol7.onrender.com |
+| Health   | https://orbitz-1ol7.onrender.com/health |
+| API docs | https://orbitz-1ol7.onrender.com/docs |
+
+**Hosting (free tier):**
+
+- Frontend → GitHub Pages
+- Backend → Render
+- Database → Neon Postgres
+
+The Render free service sleeps after ~15 minutes of inactivity. The first request after idle can take 30–60 seconds.
+
+Register a **new** account on the live site — local SQLite users are not on Neon.
+
+---
+
 ## What Orbitz Does
 
 ```text
@@ -85,6 +106,8 @@ Activity Level: Moderate
 Fitness Score: 72/100
 ```
 
+If `backend/app/ml/model.pkl` is missing, a heuristic fallback is used.
+
 ### AI Fitness Agent
 
 The agent receives:
@@ -108,21 +131,23 @@ If no Groq API key is set, or the LLM call fails, Orbitz falls back to the rule-
 
 # Tech Stack
 
-| Component       | Technology        |
-| --------------- | ----------------- |
-| Frontend        | React + Vite      |
-| Styling         | CSS               |
-| Backend         | FastAPI           |
-| Language        | Python            |
-| Database        | SQLite (default)  |
-| ORM             | SQLAlchemy        |
-| Authentication  | JWT               |
-| ML              | Scikit-learn      |
-| AI              | Groq LLM + rules  |
-| Reports         | PDF (fpdf2)       |
-| Charts          | Recharts          |
+| Component       | Technology                          |
+| --------------- | ----------------------------------- |
+| Frontend        | React + Vite                        |
+| Styling         | CSS                                 |
+| Backend         | FastAPI                             |
+| Language        | Python 3.11                         |
+| Database        | SQLite (local) / Postgres (Neon)    |
+| ORM             | SQLAlchemy                          |
+| Authentication  | JWT                                 |
+| ML              | Scikit-learn (+ heuristic fallback) |
+| AI              | Groq LLM + rules                    |
+| Reports         | PDF (fpdf2)                         |
+| Charts          | Recharts                            |
+| Frontend host   | GitHub Pages                        |
+| Backend host    | Render                              |
 
-PostgreSQL can be used by setting `DATABASE_URL`. Local development uses SQLite (`backend/orbitz.db`). New columns are added with `ALTER TABLE` so existing rows are kept.
+Local development uses SQLite (`backend/orbitz.db`). Production uses Neon Postgres via `DATABASE_URL`. Tables are created on startup. New SQLite columns are added with `ALTER TABLE` so existing rows are kept.
 
 ---
 
@@ -130,33 +155,21 @@ PostgreSQL can be used by setting `DATABASE_URL`. Local development uses SQLite 
 
 ```text
 orbitz/
+├── .github/
+│   └── workflows/
+│       └── deploy-frontend.yml   # GitHub Pages CI
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── Navbar.jsx
-│   │   │   ├── StatCard.jsx
-│   │   │   ├── FitnessPlanCard.jsx
-│   │   │   ├── ProgressChart.jsx
-│   │   │   ├── ThemeToggle.jsx
-│   │   │   └── Loading.jsx
 │   │   ├── pages/
-│   │   │   ├── Login.jsx
-│   │   │   ├── Register.jsx
-│   │   │   ├── Onboarding.jsx
-│   │   │   ├── Dashboard.jsx
-│   │   │   ├── DailyCheckIn.jsx
-│   │   │   ├── TomorrowPlan.jsx
-│   │   │   └── Progress.jsx
 │   │   ├── services/
-│   │   │   └── api.js
+│   │   │   └── api.js            # uses VITE_API_URL in production
 │   │   ├── context/
-│   │   │   ├── AuthContext.jsx
-│   │   │   └── ThemeContext.jsx
 │   │   ├── App.jsx
 │   │   ├── main.jsx
 │   │   └── index.css
+│   ├── vite.config.js            # base path for GitHub Pages
 │   └── package.json
-│
 ├── backend/
 │   ├── app/
 │   │   ├── main.py
@@ -164,17 +177,12 @@ orbitz/
 │   │   ├── models/
 │   │   ├── schemas/
 │   │   ├── services/
-│   │   │   ├── agent_service.py
-│   │   │   ├── exercise_rules.py
-│   │   │   ├── diet_rules.py
-│   │   │   ├── report_service.py
-│   │   │   └── fitness_service.py
 │   │   ├── ml/
 │   │   ├── database/
 │   │   └── config.py
+│   ├── .python-version           # 3.11.11 for Render
 │   ├── requirements.txt
 │   └── .env.example
-│
 ├── ml/
 ├── README.md
 └── .gitignore
@@ -425,7 +433,7 @@ Tables are created on startup. New columns are added without deleting existing d
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8020
 ```
 
-The frontend currently calls the API on port **8020** (`frontend/src/services/api.js`).
+Locally, the frontend calls the API on port **8020**. In production it uses `VITE_API_URL`.
 
 - API: http://127.0.0.1:8020
 - Docs: http://127.0.0.1:8020/docs
@@ -444,7 +452,57 @@ npm run dev
 
 On the same Wi-Fi, others can open the Network URL Vite prints (for example `http://<your-lan-ip>:5173`). Keep the backend listening on `0.0.0.0`.
 
-**Never commit `.env` files that contain real API keys.**
+**Never commit `.env` files that contain real API keys or database passwords.**
+
+---
+
+# Deployment (free)
+
+Production stack:
+
+| Piece     | Service      |
+| --------- | ------------ |
+| Frontend  | GitHub Pages |
+| Backend   | Render       |
+| Database  | Neon Postgres|
+
+### Why not SQLite on Render?
+
+Render’s free disk is temporary. Sleep, redeploy, or restart wipes `orbitz.db`. Neon keeps data outside the container.
+
+### Backend (Render)
+
+- **Root Directory:** `backend`
+- **Build:** `pip install -r requirements.txt`
+- **Start:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- **Python:** `3.11.11` (via `backend/.python-version` or `PYTHON_VERSION`)
+
+Environment variables:
+
+```env
+DATABASE_URL=<Neon pooled connection string>
+SECRET_KEY=<long random string>
+CORS_ORIGINS=https://vishwasvarma.github.io
+ACCESS_TOKEN_EXPIRE_MINUTES=10080
+GROQ_API_KEY=<optional>
+GROQ_MODEL=llama-3.3-70b-versatile
+PYTHON_VERSION=3.11.11
+```
+
+### Frontend (GitHub Pages)
+
+Workflow: `.github/workflows/deploy-frontend.yml`
+
+1. Repo **Settings → Pages → Source:** GitHub Actions
+2. Repo **Settings → Variables → Actions:** set `VITE_API_URL` to the Render URL (no trailing slash), e.g. `https://orbitz-1ol7.onrender.com`
+3. Push to `main` under `frontend/`, or run **Deploy frontend to GitHub Pages** manually
+
+The workflow builds with `VITE_BASE_PATH=/orbitz/` and copies `index.html` to `404.html` so React Router refreshes work on Pages.
+
+### Live URLs
+
+- App: https://vishwasvarma.github.io/orbitz/
+- API: https://orbitz-1ol7.onrender.com
 
 ---
 
